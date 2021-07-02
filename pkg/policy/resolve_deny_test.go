@@ -148,7 +148,7 @@ func (ds *PolicyTestSuite) TestL3WithIngressDenyWildcard(c *C) {
 	defer repo.Mutex.RUnlock()
 	selPolicy, err := repo.resolvePolicyLocked(fooIdentity)
 	c.Assert(err, IsNil)
-	policy := selPolicy.DistillPolicy(DummyOwner{}, false)
+	policy := selPolicy.DistillPolicy(DummyOwner{}, false, repo)
 
 	expectedEndpointPolicy := EndpointPolicy{
 		selectorPolicy: &selectorPolicy{
@@ -229,7 +229,7 @@ func (ds *PolicyTestSuite) TestL3WithLocalHostWildcardd(c *C) {
 
 	selPolicy, err := repo.resolvePolicyLocked(fooIdentity)
 	c.Assert(err, IsNil)
-	policy := selPolicy.DistillPolicy(DummyOwner{}, false)
+	policy := selPolicy.DistillPolicy(DummyOwner{}, false, repo)
 
 	cachedSelectorHost := testSelectorCache.FindCachedIdentitySelector(api.ReservedEndpointSelectors[labels.IDNameHost])
 	c.Assert(cachedSelectorHost, Not(IsNil))
@@ -312,10 +312,10 @@ func (ds *PolicyTestSuite) TestMapStateWithIngressDenyWildcard(c *C) {
 	defer repo.Mutex.RUnlock()
 	selPolicy, err := repo.resolvePolicyLocked(fooIdentity)
 	c.Assert(err, IsNil)
-	policy := selPolicy.DistillPolicy(DummyOwner{}, false)
+	policy := selPolicy.DistillPolicy(DummyOwner{}, false, repo)
 
-	rule1MapStateEntry := NewMapStateEntry(wildcardCachedSelector, labels.LabelArrayList{ruleLabel}, false, true)
-	allowEgressMapStateEntry := NewMapStateEntry(nil, labels.LabelArrayList{ruleLabelAllowAnyEgress}, false, false)
+	rule1MapStateEntry := NewMapStateEntry(wildcardCachedSelector, labels.LabelArrayList{ruleLabel}, false, true, false)
+	allowEgressMapStateEntry := NewMapStateEntry(nil, labels.LabelArrayList{ruleLabelAllowAnyEgress}, false, false, false)
 
 	expectedEndpointPolicy := EndpointPolicy{
 		selectorPolicy: &selectorPolicy{
@@ -422,7 +422,7 @@ func (ds *PolicyTestSuite) TestMapStateWithIngressDeny(c *C) {
 	defer repo.Mutex.RUnlock()
 	selPolicy, err := repo.resolvePolicyLocked(fooIdentity)
 	c.Assert(err, IsNil)
-	policy := selPolicy.DistillPolicy(DummyOwner{}, false)
+	policy := selPolicy.DistillPolicy(DummyOwner{}, false, repo)
 
 	// Add new identity to test accumulation of MapChanges
 	added1 := cache.IdentityCache{
@@ -447,8 +447,9 @@ func (ds *PolicyTestSuite) TestMapStateWithIngressDeny(c *C) {
 	cachedSelectorTest := testSelectorCache.FindCachedIdentitySelector(api.NewESFromLabels(lblTest))
 	c.Assert(cachedSelectorTest, Not(IsNil))
 
-	rule1MapStateEntry := NewMapStateEntry(cachedSelectorTest, labels.LabelArrayList{ruleLabel}, false, true)
-	allowEgressMapStateEntry := NewMapStateEntry(nil, labels.LabelArrayList{ruleLabelDenyAnyEgress}, false, false)
+	//TODO: M_AUDITMODE
+	rule1MapStateEntry := NewMapStateEntry(cachedSelectorTest, labels.LabelArrayList{ruleLabel}, false, true, false)
+	allowEgressMapStateEntry := NewMapStateEntry(nil, labels.LabelArrayList{ruleLabelDenyAnyEgress}, false, false, false)
 
 	expectedEndpointPolicy := EndpointPolicy{
 		selectorPolicy: &selectorPolicy{

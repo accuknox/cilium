@@ -15,6 +15,7 @@
 package client
 
 import (
+	"errors"
 	"github.com/cilium/cilium/api/v1/client/policy"
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/pkg/api"
@@ -64,6 +65,19 @@ func (c *Client) PolicyDelete(labels []string) (*models.Policy, error) {
 func (c *Client) PolicyResolveGet(traceSelector *models.TraceSelector) (*models.PolicyTraceResult, error) {
 	params := policy.NewGetPolicyResolveParams().WithTraceSelector(traceSelector).WithTimeout(api.ClientTimeout)
 	resp, err := c.Policy.GetPolicyResolve(params)
+	if err != nil {
+		return nil, Hint(err)
+	}
+	return resp.Payload, nil
+}
+
+func (c *Client) PolicyIDGet(RuleID uint16) (*models.PolicyID, error) {
+	if RuleID <= 0 && RuleID > 65535 {
+		return nil, Hint(errors.New("Invalid rule ID"))
+	}
+	params := policy.NewGetPolicyIDParams()
+	params.SetID(int64(RuleID))
+	resp, err := c.Policy.GetPolicyID(params)
 	if err != nil {
 		return nil, Hint(err)
 	}
