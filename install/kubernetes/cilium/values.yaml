@@ -9,6 +9,10 @@ debug:
   enabled: false
   # verbose:
 
+spiffe:
+  enabled: false
+  socketAdminPath: /run/spire/sockets-admin/admin.sock
+
 rbac:
   # -- Enable creation of Resource-Based Access Control configuration.
   create: true

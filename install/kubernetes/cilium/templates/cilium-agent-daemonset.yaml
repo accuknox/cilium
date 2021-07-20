@@ -337,6 +337,11 @@ spec:
           name: bgp-config-path
           readOnly: true
 {{- end }}
+{{- if .Values.spiffe.enabled }}
+        - name: spire-admin-agent-socket
+          mountPath: /run/spire/sockets-admin
+          readOnly: false
+{{- end }}
 {{- if and (.Values.hubble.enabled) (hasKey .Values.hubble "listenAddress") (.Values.hubble.tls.enabled) }}
         - mountPath: /var/lib/cilium/tls/hubble
           name: hubble-tls
@@ -571,6 +576,12 @@ spec:
           defaultMode: 420
           optional: true
           secretName: cilium-clustermesh
+{{- if .Values.spiffe.enabled }}
+      - name: spire-admin-agent-socket
+        hostPath:
+          path: /run/spire/sockets-admin
+          type: DirectoryOrCreate
+{{- end }}
         # To read the configuration from the config map
       - configMap:
           name: cilium-config

@@ -126,6 +126,10 @@ data:
   labels: {{ .Values.labels | quote }}
 {{- end }}
 
+  # If you want to run cilium in spiffe mode change this value to true
+  enable-spiffe: {{ .Values.spiffe.enabled | quote }}
+  spire-privileged-api-socket-path: {{ .Values.spiffe.socketAdminPath | quote }}
+
   # If you want to run cilium in debug mode change this value to true
   debug: {{ .Values.debug.enabled | quote }}
 

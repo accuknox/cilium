@@ -2693,6 +2693,27 @@ func (kub *Kubectl) WaitForCEPIdentity(ns, podName string) error {
 	return WithContext(ctx, body, 1*time.Second)
 }
 
+// // WaitForCEPLabel waits for a particular CEP to have an specific label.
+// func (kub *Kubectl) WaitForCEPLabel(ns, podName string) error {
+// 	body := func(ctx context.Context) (bool, error) {
+// 		cmd := fmt.Sprintf("cilium endpoint list -o jsonpath='{[?(@.status.identity.id==%d)].id}'",
+// 			ReservedIdentityHost)
+// 		res := kub.CiliumExecContext(ctx.Background(), ciliumPod, cmd)
+// 		ep, err := kub.GetCiliumEndpoint(ns, podName)
+// 		if err != nil || ep == nil {
+// 			return false, nil
+// 		}
+// 		if ep.Identity == nil {
+// 			return false, nil
+// 		}
+// 		return ep.Identity.ID != 0, nil
+// 	}
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), HelperTimeout)
+// 	defer cancel()
+// 	return WithContext(ctx, body, 1*time.Second)
+// }
+
 // CiliumExecContext runs cmd in the specified Cilium pod with the given context.
 func (kub *Kubectl) CiliumExecContext(ctx context.Context, pod string, cmd string) *CmdRes {
 	limitTimes := 5
