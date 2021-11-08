@@ -1,0 +1,34 @@
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+    name: "test-client-identity"
+specs:
+    - description: Simple policy for authorize requests by means of Jwt token authetication.
+      endpointSelector:
+        matchLabels:
+          component: webserver
+      ingress:
+      - toPorts:
+        - ports:
+          - port: "7070"
+            protocol: TCP
+          rules:
+            http:
+            - matchJWT:
+              - provider: AUTH0
+                issuer: "https://dev-8as2ijf5.us.auth0.com/"
+                audiences:
+                  - 'thales-accuknox-1st'
+                  - 'thales-accuknox-2nd'
+                jwksUrl: "https://dev-8as2ijf5.us.auth0.com/.well-known/jwks.json"
+                forward: true
+                fromHeaders: false
+                fromParams: false
+              - provider: AUTH0
+                issuer: "https://dev-8as2ijf5.us.auth0.com/"
+                audiences:
+                  - 'thales-accuknox-3rd'
+                jwksUrl: "https://dev-8as2ijf5.us.auth0.com/.well-known/jwks.json"
+                forward: true
+                fromHeaders: false
+                fromParams: false

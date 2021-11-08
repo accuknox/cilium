@@ -103,13 +103,13 @@ func (s *EnvoySuite) TestEnvoy(c *C) {
 	s.waitGroup = completion.NewWaitGroup(ctx)
 
 	log.Debug("adding listener1")
-	xdsServer.AddListener("listener1", policy.ParserTypeHTTP, 8081, true, false, s.waitGroup, false, false)
+	xdsServer.AddListener("listener1", policy.ParserTypeHTTP, 8081, true, false, s.waitGroup, false, false, nil)
 
 	log.Debug("adding listener2")
-	xdsServer.AddListener("listener2", policy.ParserTypeHTTP, 8082, true, false, s.waitGroup, false, false)
+	xdsServer.AddListener("listener2", policy.ParserTypeHTTP, 8082, true, false, s.waitGroup, false, false, nil)
 
 	log.Debug("adding listener3")
-	xdsServer.AddListener("listener3", policy.ParserTypeHTTP, 8083, false, false, s.waitGroup, false, false)
+	xdsServer.AddListener("listener3", policy.ParserTypeHTTP, 8083, false, false, s.waitGroup, false, false, nil)
 
 	err = s.waitForProxyCompletion()
 	c.Assert(err, IsNil)
@@ -127,7 +127,7 @@ func (s *EnvoySuite) TestEnvoy(c *C) {
 
 	// Add listener3 again
 	log.Debug("adding listener 3")
-	xdsServer.AddListener("listener3", policy.L7ParserType("test.headerparser"), 8083, false, false, s.waitGroup, false, false)
+	xdsServer.AddListener("listener3", policy.L7ParserType("test.headerparser"), 8083, false, false, s.waitGroup, false, false, nil)
 
 	err = s.waitForProxyCompletion()
 	c.Assert(err, IsNil)
@@ -177,7 +177,7 @@ func (s *EnvoySuite) TestEnvoyNACK(c *C) {
 	rName := "listener:22"
 
 	log.Debug("adding ", rName)
-	xdsServer.AddListener(rName, policy.ParserTypeHTTP, 22, true, false, s.waitGroup, false, false)
+	xdsServer.AddListener(rName, policy.ParserTypeHTTP, 22, true, false, s.waitGroup, false, false, nil)
 
 	err = s.waitForProxyCompletion()
 	c.Assert(err, Not(IsNil))

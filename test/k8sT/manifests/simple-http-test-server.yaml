@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-http-test-server
+  labels:
+    component: webserver
+spec:
+  containers:
+  - name: simple-http-test-server
+    image: python:3
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "python3 -m http.server 7070" ]

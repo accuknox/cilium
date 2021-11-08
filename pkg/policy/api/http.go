@@ -63,6 +63,41 @@ type HeaderMatch struct {
 	Value string `json:"value,omitempty"`
 }
 
+// when using a external identity provider envoy will need to fetch
+// a json file from service provider server. For that reason an upstream
+// cluster is necessary. The ProviderSrvc is used  to select the correct
+// cluster configuration accondingly with the used provider.
+type ProviderSrvc string
+
+const (
+	ProviderAuth0 ProviderSrvc = "AUTH0"
+	ProviderGcp   ProviderSrvc = "GCP"
+)
+
+// cluster configurations to be used along with external identity providers.
+// all supported services should have its own cluster configuration. In the
+// future should be possible to use "Dynamic Forward Proxy" because today it's
+// not working as expected (alpha version).
+type JwksProviderCluster string
+
+const (
+	JwksProviderAuth0Cluster JwksProviderCluster = "Auth0_remote_jwks_fetching_cluster"
+	JwksProviderGcpCluster   JwksProviderCluster = "Gcp_remote_jwks_fetching_cluster"
+)
+
+type MatchJWT struct {
+	// Fields is a list of jwt_authN fields.
+	//
+	// +kubebuilder:validation:Optional
+	Provider    ProviderSrvc `json:"provider,omitempty"`
+	Issuer      string       `json:"issuer,omitempty"`
+	Audiences   []string     `json:"audiences,omitempty"`
+	JwksUrl     string       `json:"jwksUrl,omitempty"`
+	Forward     bool         `json:"forward,omitempty"`
+	FromHeaders bool         `json:"fromHeaders,omitempty"`
+	FromParams  bool         `json:"fromParams,omitempty"`
+}
+
 // PortRuleHTTP is a list of HTTP protocol constraints. All fields are
 // optional, if all fields are empty or missing, the rule does not have any
 // effect.
@@ -122,6 +157,13 @@ type PortRuleHTTP struct {
 	//
 	// +kubebuilder:validation:Optional
 	AuditMode bool `json:"auditMode,omitempty"`
+
+	// MatchJWT is list of identity providers used to authenticate
+	// and authorize requests on micro-segmentation basis using jwt
+	// tokens
+	//
+	// +kubebuilder:validation:Optional
+	MatchJWT []*MatchJWT `json:"matchJWT,omitempty"`
 }
 
 // Sanitize sanitizes HTTP rules. It ensures that the path and method fields
@@ -161,5 +203,32 @@ func (h *PortRuleHTTP) Sanitize() error {
 		}
 	}
 
+	// and about matchJWT?
+
 	return nil
+}
+
+func (h *MatchJWT) Equal(o *MatchJWT) bool {
+	if h.Provider != o.Provider ||
+		h.Issuer != o.Issuer ||
+		!h.strSliceCmp(h.Audiences, o.Audiences) ||
+		h.JwksUrl != o.JwksUrl ||
+		h.Forward != o.Forward ||
+		h.FromHeaders != o.FromHeaders ||
+		h.FromParams != o.FromParams {
+		return false
+	}
+	return true
+}
+
+func (h *MatchJWT) strSliceCmp(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }

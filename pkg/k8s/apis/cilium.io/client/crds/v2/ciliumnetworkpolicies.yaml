@@ -4056,6 +4056,41 @@ spec:
                                           - name
                                           type: object
                                         type: array
+                                      matchJWT:
+                                        description: The matchJWT property is used to configure envoy jwt_authN.
+                                        items:
+                                          description: Parameters for supply envoy filter configuration.
+                                          properties:
+                                            provider:
+                                              description: The provider to be used for jwks fetching.
+                                              enum:
+                                              - AUTH0
+                                              - GCP
+                                              type: string
+                                            issuer:
+                                              description: The issuer for given token.
+                                              type: string
+                                            audiences:
+                                              description: Audience for authorize request.
+                                              items:
+                                                type: string
+                                              type: array
+                                            jwksUrl:
+                                              description: Url to dowload public key for authentication.
+                                              type: string
+                                            forward:
+                                              description: Forward the token received on request.
+                                              type: boolean
+                                            fromHeaders:
+                                              description: Take the token from http headers.
+                                              type: boolean
+                                            fromParams:
+                                              description: Take the token from parameters.
+                                              type: boolean
+                                          required:
+                                          - audiences
+                                          type: object
+                                        type: array
                                       headers:
                                         description: Headers is a list of HTTP headers
                                           which must be present in the request. If

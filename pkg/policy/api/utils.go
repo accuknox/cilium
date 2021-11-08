@@ -36,7 +36,8 @@ func (h *PortRuleHTTP) Equal(o PortRuleHTTP) bool {
 		h.Method != o.Method ||
 		h.Host != o.Host ||
 		len(h.Headers) != len(o.Headers) ||
-		len(h.HeaderMatches) != len(o.HeaderMatches) {
+		len(h.HeaderMatches) != len(o.HeaderMatches) ||
+		len(h.MatchJWT) != len(o.MatchJWT) {
 		return false
 	}
 
@@ -48,6 +49,12 @@ func (h *PortRuleHTTP) Equal(o PortRuleHTTP) bool {
 
 	for i, value := range h.HeaderMatches {
 		if !o.HeaderMatches[i].Equal(value) {
+			return false
+		}
+	}
+
+	for i, value := range h.MatchJWT {
+		if !o.MatchJWT[i].Equal(value) {
 			return false
 		}
 	}

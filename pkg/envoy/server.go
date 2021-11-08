@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,12 +47,15 @@ import (
 	envoy_config_endpoint "github.com/cilium/proxy/go/envoy/config/endpoint/v3"
 	envoy_config_listener "github.com/cilium/proxy/go/envoy/config/listener/v3"
 	envoy_config_route "github.com/cilium/proxy/go/envoy/config/route/v3"
+	envoy_config_jwt_authn "github.com/cilium/proxy/go/envoy/extensions/filters/http/jwt_authn/v3"
 	envoy_config_http "github.com/cilium/proxy/go/envoy/extensions/filters/network/http_connection_manager/v3"
 	envoy_mongo_proxy "github.com/cilium/proxy/go/envoy/extensions/filters/network/mongo_proxy/v3"
 	envoy_mysql_proxy "github.com/cilium/proxy/go/envoy/extensions/filters/network/mysql_proxy/v3"
 	envoy_config_tcp "github.com/cilium/proxy/go/envoy/extensions/filters/network/tcp_proxy/v3"
+	envoy_config_upstreamtlsctx "github.com/cilium/proxy/go/envoy/extensions/transport_sockets/tls/v3"
 	envoy_config_upstream "github.com/cilium/proxy/go/envoy/extensions/upstreams/http/v3"
 	envoy_type_matcher "github.com/cilium/proxy/go/envoy/type/matcher/v3"
+	"google.golang.org/protobuf/types/known/durationpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/golang/protobuf/proto"
@@ -207,7 +211,7 @@ func StartXDSServer(stateDir string) *XDSServer {
 	}
 }
 
-func (s *XDSServer) getHttpFilterChainProto(clusterName string, tls bool) *envoy_config_listener.FilterChain {
+func (s *XDSServer) getHttpFilterChainProto(clusterName string, tls bool, jwt []*api.MatchJWT) *envoy_config_listener.FilterChain {
 	denied403body := option.Config.HTTP403Message
 	requestTimeout := int64(option.Config.HTTPRequestTimeout) // seconds
 	idleTimeout := int64(option.Config.HTTPIdleTimeout)       // seconds
@@ -217,17 +221,17 @@ func (s *XDSServer) getHttpFilterChainProto(clusterName string, tls bool) *envoy
 
 	hcmConfig := &envoy_config_http.HttpConnectionManager{
 		StatPrefix: "proxy",
-		HttpFilters: []*envoy_config_http.HttpFilter{{
-			Name: "cilium.l7policy",
-			ConfigType: &envoy_config_http.HttpFilter_TypedConfig{
-				TypedConfig: toAny(&cilium.L7Policy{
-					AccessLogPath:  s.accessLogPath,
-					Denied_403Body: denied403body,
-				}),
+		HttpFilters: []*envoy_config_http.HttpFilter{
+			{
+				Name: "cilium.l7policy",
+				ConfigType: &envoy_config_http.HttpFilter_TypedConfig{
+					TypedConfig: toAny(&cilium.L7Policy{
+						AccessLogPath:  s.accessLogPath,
+						Denied_403Body: denied403body,
+					}),
+				},
 			},
-		}, {
-			Name: "envoy.filters.http.router",
-		}},
+		},
 		StreamIdleTimeout: &duration.Duration{}, // 0 == disabled
 		RouteSpecifier: &envoy_config_http.HttpConnectionManager_RouteConfig{
 			RouteConfig: &envoy_config_route.RouteConfiguration{
@@ -278,6 +282,86 @@ func (s *XDSServer) getHttpFilterChainProto(clusterName string, tls bool) *envoy
 			},
 		},
 	}
+
+	//if match jwt exist add a second filter in the chain
+	if jwt != nil {
+		var providerPrefix string
+		var jwksClusterName string
+
+		jwtRecords := make(map[string]*envoy_config_jwt_authn.JwtProvider, len(jwt))
+
+		for i := range jwt {
+			switch jwt[i].Provider {
+			case api.ProviderAuth0:
+				providerPrefix = string(api.ProviderAuth0)
+				jwksClusterName = string(api.JwksProviderAuth0Cluster)
+			case api.ProviderGcp:
+				providerPrefix = string(api.ProviderGcp)
+				jwksClusterName = string(api.JwksProviderGcpCluster)
+			default:
+				providerPrefix = string(api.ProviderAuth0)
+				jwksClusterName = string(api.JwksProviderAuth0Cluster)
+			}
+
+			jwtRecords[providerPrefix+strconv.Itoa(i)] = &envoy_config_jwt_authn.JwtProvider{
+				Issuer:    jwt[i].Issuer,
+				Audiences: jwt[i].Audiences,
+				JwksSourceSpecifier: &envoy_config_jwt_authn.JwtProvider_RemoteJwks{
+					RemoteJwks: &envoy_config_jwt_authn.RemoteJwks{
+						HttpUri: &envoy_config_core.HttpUri{
+							Uri: jwt[i].JwksUrl,
+							Timeout: &durationpb.Duration{
+								Seconds: 5, //TODO: Create config
+							},
+							HttpUpstreamType: &envoy_config_core.HttpUri_Cluster{Cluster: jwksClusterName},
+						},
+						CacheDuration: &durationpb.Duration{
+							Seconds: 300, //TODO: Create config
+						},
+					},
+				},
+				Forward: jwt[i].Forward,
+			}
+		}
+
+		var requirements []*envoy_config_jwt_authn.JwtRequirement
+
+		for k := range jwtRecords {
+			requirements = append(requirements, &envoy_config_jwt_authn.JwtRequirement{
+				RequiresType: &envoy_config_jwt_authn.JwtRequirement_ProviderName{
+					ProviderName: k,
+				},
+			})
+		}
+		hcmConfig.HttpFilters = append(hcmConfig.HttpFilters, &envoy_config_http.HttpFilter{
+			Name: "envoy.filters.http.jwt_authn",
+			ConfigType: &envoy_config_http.HttpFilter_TypedConfig{
+				TypedConfig: toAny(&envoy_config_jwt_authn.JwtAuthentication{
+					Providers: jwtRecords,
+
+					Rules: []*envoy_config_jwt_authn.RequirementRule{
+						{
+							Match: &envoy_config_route.RouteMatch{PathSpecifier: &envoy_config_route.RouteMatch_Prefix{Prefix: "/"}},
+							RequirementType: &envoy_config_jwt_authn.RequirementRule_Requires{
+								Requires: &envoy_config_jwt_authn.JwtRequirement{
+									RequiresType: &envoy_config_jwt_authn.JwtRequirement_RequiresAny{
+										RequiresAny: &envoy_config_jwt_authn.JwtRequirementOrList{
+											Requirements: requirements,
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		})
+	}
+
+	// http.router must be the last filter in the chain
+	hcmConfig.HttpFilters = append(hcmConfig.HttpFilters, &envoy_config_http.HttpFilter{
+		Name: "envoy.filters.http.router",
+	})
 
 	if option.Config.HTTPNormalizePath {
 		hcmConfig.NormalizePath = &wrappers.BoolValue{Value: true}
@@ -517,7 +601,7 @@ func (s *XDSServer) addListener(name string, port uint16, listenerConf func() *e
 	s.mutex.Unlock()
 }
 
-func (s *XDSServer) getListenerConf(name string, kind policy.L7ParserType, port uint16, isIngress bool, mayUseOriginalSourceAddr bool, hasOriginatingTLS, hasTerminatingTLS bool) *envoy_config_listener.Listener {
+func (s *XDSServer) getListenerConf(name string, kind policy.L7ParserType, port uint16, isIngress bool, mayUseOriginalSourceAddr bool, hasOriginatingTLS, hasTerminatingTLS bool, jwt []*api.MatchJWT) *envoy_config_listener.Listener {
 	clusterName := egressClusterName
 	socketMark := int64(0xB00)
 	if isIngress {
@@ -570,26 +654,25 @@ func (s *XDSServer) getListenerConf(name string, kind policy.L7ParserType, port 
 		if isIngress {
 			tlsClusterName = ingressTLSClusterName
 		}
-
 		if hasOriginatingTLS == hasTerminatingTLS {
 			// HTTP -> HTTP
-			listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(clusterName, false))
+			listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(clusterName, false, jwt))
 
 			// HTTPS -> HTTPS
-			listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(tlsClusterName, true))
+			listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(tlsClusterName, true, jwt))
 		} else {
 			if hasOriginatingTLS {
 				// HTTP -> HTTPS
-				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(tlsClusterName, false))
+				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(tlsClusterName, false, jwt))
 
 				// HTTPS -> HTTPS
-				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(tlsClusterName, true))
+				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(tlsClusterName, true, jwt))
 			} else {
 				// HTTPS -> HTTP
-				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(clusterName, true))
+				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(clusterName, true, jwt))
 
 				// HTTP -> HTTP
-				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(clusterName, false))
+				listenerConf.FilterChains = append(listenerConf.FilterChains, s.getHttpFilterChainProto(clusterName, false, jwt))
 			}
 		}
 	} else {
@@ -613,11 +696,11 @@ func (s *XDSServer) getListenerConf(name string, kind policy.L7ParserType, port 
 }
 
 // AddListener adds a listener to a running Envoy proxy.
-func (s *XDSServer) AddListener(name string, kind policy.L7ParserType, port uint16, isIngress bool, mayUseOriginalSourceAddr bool, wg *completion.WaitGroup, hasOriginatingTLS, hasTerminatingTLS bool) {
+func (s *XDSServer) AddListener(name string, kind policy.L7ParserType, port uint16, isIngress bool, mayUseOriginalSourceAddr bool, wg *completion.WaitGroup, hasOriginatingTLS, hasTerminatingTLS bool, jwt []*api.MatchJWT) {
 	log.Debugf("Envoy: %s AddListener %s (mayUseOriginalSourceAddr: %v)", kind, name, mayUseOriginalSourceAddr)
 
 	s.addListener(name, port, func() *envoy_config_listener.Listener {
-		return s.getListenerConf(name, kind, port, isIngress, mayUseOriginalSourceAddr, hasOriginatingTLS, hasTerminatingTLS)
+		return s.getListenerConf(name, kind, port, isIngress, mayUseOriginalSourceAddr, hasOriginatingTLS, hasTerminatingTLS, jwt)
 	}, wg, nil)
 }
 
@@ -1009,6 +1092,52 @@ func createBootstrap(filePath string, nodeId, cluster string, xdsSock, egressClu
 								},
 							}},
 						}},
+					},
+				},
+				{ // TODO: add other supported clusters
+					Name:                 string(api.JwksProviderAuth0Cluster),
+					ConnectTimeout:       &duration.Duration{Seconds: connectTimeout, Nanos: 0},
+					ClusterDiscoveryType: &envoy_config_cluster.Cluster_Type{Type: envoy_config_cluster.Cluster_LOGICAL_DNS},
+					DnsLookupFamily:      envoy_config_cluster.Cluster_V4_ONLY,
+					LbPolicy:             envoy_config_cluster.Cluster_ROUND_ROBIN,
+					LoadAssignment: &envoy_config_endpoint.ClusterLoadAssignment{
+						ClusterName: string(api.JwksProviderAuth0Cluster),
+						Endpoints: []*envoy_config_endpoint.LocalityLbEndpoints{
+							{
+								LbEndpoints: []*envoy_config_endpoint.LbEndpoint{
+									{
+										HostIdentifier: &envoy_config_endpoint.LbEndpoint_Endpoint{
+											Endpoint: &envoy_config_endpoint.Endpoint{
+												Address: &envoy_config_core.Address{
+													Address: &envoy_config_core.Address_SocketAddress{
+														SocketAddress: &envoy_config_core.SocketAddress{
+															Address: "dev-8as2ijf5.us.auth0.com",
+															PortSpecifier: &envoy_config_core.SocketAddress_PortValue{
+																PortValue: 443,
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					TransportSocket: &envoy_config_core.TransportSocket{
+						Name: "envoy.transport_sockets.tls",
+						ConfigType: &envoy_config_core.TransportSocket_TypedConfig{
+							TypedConfig: toAny(&envoy_config_upstreamtlsctx.UpstreamTlsContext{
+								CommonTlsContext: &envoy_config_upstreamtlsctx.CommonTlsContext{
+									ValidationContextType: &envoy_config_upstreamtlsctx.CommonTlsContext_ValidationContext{
+										ValidationContext: &envoy_config_upstreamtlsctx.CertificateValidationContext{
+											TrustedCa: &envoy_config_core.DataSource{Specifier: &envoy_config_core.DataSource_Filename{Filename: "/etc/ssl/certs/ca-certificates.crt"}},
+										},
+									},
+								},
+							}),
+						},
 					},
 				},
 			},
