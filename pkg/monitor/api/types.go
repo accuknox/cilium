@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/cilium/cilium/pkg/monitor/notifications"
+	"github.com/cilium/cilium/pkg/option"
 )
 
 // Must be synchronized with <bpf/lib/common.h>
@@ -184,9 +185,14 @@ func TraceObservationPointHasConnState(obsPoint uint8) bool {
 	case TraceToLxc,
 		TraceToProxy,
 		TraceToHost,
-		TraceToStack,
-		TraceToNetwork:
+		TraceToStack:
 		return true
+	case TraceToNetwork,
+		TraceFromNetwork:
+		if option.Config.EnableHostFirewall {
+			return true
+		}
+		fallthrough
 	default:
 		return false
 	}

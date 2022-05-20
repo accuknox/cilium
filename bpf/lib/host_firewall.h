@@ -411,6 +411,9 @@ ipv4_host_policy_egress(struct __ctx_buff *ctx, __u32 src_id,
 		return ctx_redirect_to_proxy_hairpin(ctx, proxy_port);
 	}
 
+	send_trace_notify(ctx, TRACE_TO_NETWORK, HOST_ID, dst_id, 0, 0,
+									reason, TRACE_PAYLOAD_LEN);
+
 	return CTX_ACT_OK;
 }
 
@@ -535,6 +538,9 @@ ipv4_host_policy_ingress(struct __ctx_buff *ctx, __u32 *src_id)
 				  0, 0, reason, monitor);
 		return ctx_redirect_to_proxy4(ctx, &tuple, proxy_port, true);
 	}
+
+	send_trace_notify(ctx, TRACE_FROM_NETWORK, *src_id, HOST_ID, 0,
+					ctx->ingress_ifindex, reason, TRACE_PAYLOAD_LEN);
 
 	/* This change is necessary for packets redirected from the lxc device to
 	 * the host device.

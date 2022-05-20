@@ -883,8 +883,10 @@ do_netdev(struct __ctx_buff *ctx, __u16 proto, const bool from_host)
 				  ctx->ingress_ifindex, 0, TRACE_PAYLOAD_LEN);
 	} else {
 		bpf_skip_nodeport_clear(ctx);
+#ifndef ENABLE_HOST_FIREWALL
 		send_trace_notify(ctx, TRACE_FROM_NETWORK, 0, 0, 0,
 				  ctx->ingress_ifindex, 0, TRACE_PAYLOAD_LEN);
+#endif
 	}
 
 	switch (proto) {
@@ -1085,9 +1087,10 @@ out:
 		return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP,
 					      METRIC_EGRESS);
 #endif
+#ifndef ENABLE_HOST_FIREWALL
 	send_trace_notify(ctx, TRACE_TO_NETWORK, src_id, 0, 0,
 			  0, ret, monitor);
-
+#endif
 	return ret;
 }
 
