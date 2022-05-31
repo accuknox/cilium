@@ -1606,6 +1606,7 @@ func runDaemon() {
 
 	if d.endpointManager.HostEndpointExists() {
 		d.endpointManager.InitHostEndpointLabels(d.ctx)
+		d.endpointManager.SetHostPodNameAndNamespace()
 	} else {
 		log.Info("Creating host endpoint")
 		if err := d.endpointManager.AddHostEndpoint(d.ctx, d, d.l7Proxy, d.identityAllocator,

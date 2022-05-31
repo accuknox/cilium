@@ -173,7 +173,7 @@ func (n *NodeDiscovery) JoinCluster(nodeName string) {
 
 	nid := identity.NumericIdentity(resp.NodeIdentity)
 	identity.SetLocalNodeID(nid)
-	if (nid != identity.IdentityUnknown) && option.Config.ExternalWorkload {
+	if nid != identity.IdentityUnknown {
 		identity.SetReservedHostIdentity(nid, resp.Labels)
 	}
 }

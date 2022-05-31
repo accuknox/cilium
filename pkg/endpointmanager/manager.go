@@ -632,6 +632,8 @@ func (mgr *EndpointManager) AddHostEndpoint(ctx context.Context, owner regenerat
 
 	ep.InitWithNodeLabels(ctx, launchTime)
 
+	mgr.SetHostPodNameAndNamespace()
+
 	return nil
 }
 
@@ -640,6 +642,17 @@ func (mgr *EndpointManager) AddHostEndpoint(ctx context.Context, owner regenerat
 func (mgr *EndpointManager) InitHostEndpointLabels(ctx context.Context) {
 	ep := mgr.GetHostEndpoint()
 	ep.InitWithNodeLabels(ctx, launchTime)
+}
+
+// SetHostPodNameAndNamespace update the host endpoint's
+// fields - K8sPodName and K8sNamespace based on node labels.
+func (mgr *EndpointManager) SetHostPodNameAndNamespace() {
+	ep := mgr.GetHostEndpoint()
+	if ep != nil {
+		podName, namespace := node.GetNameAndNamespace()
+		ep.SetK8sPodName(podName)
+		ep.SetK8sNamespace(namespace)
+	}
 }
 
 // WaitForEndpointsAtPolicyRev waits for all endpoints which existed at the time
