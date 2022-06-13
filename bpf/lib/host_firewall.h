@@ -70,6 +70,10 @@ ipv6_host_policy_egress(struct __ctx_buff *ctx, __u32 src_id, __u32 *monitor)
 	verdict = policy_can_egress6(ctx, &tuple, src_id, dst_id,
 				     &policy_match_type, &audited, &rule_id);
 
+    if (skip_egress_proxy) {
+		verdict = 0;
+	}
+
 	if (verdict > 0) {
         // redirection to the proxy
         proxy_port = verdict;
@@ -81,11 +85,6 @@ ipv6_host_policy_egress(struct __ctx_buff *ctx, __u32 src_id, __u32 *monitor)
 					   tuple.nexthdr, POLICY_EGRESS, 1,
 					   verdict, policy_match_type, audited, rule_id);
 		return verdict;
-	}
-
-	if (skip_egress_proxy) {
-		verdict = 0;
-		proxy_port = 0;
 	}
 
 	switch (ret) {
@@ -190,6 +189,10 @@ ipv6_host_policy_ingress(struct __ctx_buff *ctx, __u32 *src_id)
 					    tuple.nexthdr, false,
 					    &policy_match_type, &audited, &rule_id);
 
+	if (skip_ingress_proxy) {
+		verdict = 0;
+	}
+
     if (verdict > 0) {
         // redirection to the proxy
         proxy_port = verdict;
@@ -201,11 +204,6 @@ ipv6_host_policy_ingress(struct __ctx_buff *ctx, __u32 *src_id)
 					   tuple.nexthdr, POLICY_INGRESS, 1,
 					   verdict, policy_match_type, audited, rule_id);
 		return verdict;
-	}
-
-	if (skip_ingress_proxy) {
-		verdict = 0;
-		proxy_port = 0;
 	}
 
 	switch (ret) {
@@ -357,6 +355,10 @@ ipv4_host_policy_egress(struct __ctx_buff *ctx, __u32 src_id,
 	verdict = policy_can_egress4(ctx, &tuple, src_id, dst_id,
 				     &policy_match_type, &audited, &rule_id);
 
+    if (skip_egress_proxy) {
+		verdict = 0;
+	}
+
     if (verdict > 0) {
         // redirection to the proxy
         proxy_port = verdict;
@@ -368,11 +370,6 @@ ipv4_host_policy_egress(struct __ctx_buff *ctx, __u32 src_id,
 					   tuple.nexthdr, POLICY_EGRESS, 0,
 					   verdict, policy_match_type, audited, rule_id);
 		return verdict;
-	}
-
-	if (skip_egress_proxy) {
-		verdict = 0;
-		proxy_port = 0;
 	}
 
 	switch (ret) {
@@ -484,6 +481,10 @@ ipv4_host_policy_ingress(struct __ctx_buff *ctx, __u32 *src_id)
 					    is_untracked_fragment,
 					    &policy_match_type, &audited, &rule_id);
 
+    if (skip_ingress_proxy) {
+		verdict = 0;
+	}
+
     if (verdict > 0) {
         // redirection to the proxy
         proxy_port = verdict;
@@ -495,11 +496,6 @@ ipv4_host_policy_ingress(struct __ctx_buff *ctx, __u32 *src_id)
 					   tuple.nexthdr, POLICY_INGRESS, 0,
 					   verdict, policy_match_type, audited, rule_id);
 		return verdict;
-	}
-
-	if (skip_ingress_proxy) {
-		verdict = 0;
-		proxy_port = 0;
 	}
 
 	switch (ret) {
