@@ -477,6 +477,11 @@ func (m *IptablesManager) Init() {
 // the upstream connection to allow the destination to properly derive the source security ID from
 // the source IP address.
 func (m *IptablesManager) SupportsOriginalSourceAddr() bool {
+	// Original source address cannot be used in case of Cilium External Workloads
+	if option.Config.JoinCluster {
+		return false
+	}
+
 	// Original source address use works if xt_socket match is supported, or if ip early demux
 	// is disabled, but it is not needed when tunneling is used as the tunnel header carries
 	// the source security ID.
