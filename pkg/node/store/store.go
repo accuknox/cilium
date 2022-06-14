@@ -16,16 +16,23 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"time"
 
+	"github.com/cilium/cilium/pkg/annotation"
 	"github.com/cilium/cilium/pkg/defaults"
+	"github.com/cilium/cilium/pkg/endpoint/regeneration"
+	"github.com/cilium/cilium/pkg/endpointmanager"
+	v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/kvstore/store"
+	"github.com/cilium/cilium/pkg/node/types"
 	nodeTypes "github.com/cilium/cilium/pkg/node/types"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/source"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -217,4 +224,82 @@ func (nr *NodeRegistrar) UpdateLocalKeySync(n *nodeTypes.Node) error {
 		return nr.registerStore.UpdateLocalKeySync(context.TODO(), &nodeTypes.RegisterNode{Node: *n})
 	}
 	return nr.SharedStore.UpdateLocalKeySync(context.TODO(), n)
+}
+
+type nodeWatcher struct {
+	backend kvstore.BackendOperations
+	em      *endpointmanager.EndpointManager
+}
+
+func newNodeWatcher(backend kvstore.BackendOperations, em *endpointmanager.EndpointManager) *nodeWatcher {
+	return &nodeWatcher{
+		backend,
+		em,
+	}
+}
+
+func InitNodeAnnotationWatcher(em *endpointmanager.EndpointManager) {
+	watcher := newNodeWatcher(kvstore.Client(), em)
+	go func() {
+		log.Info("Starting node watcher")
+		watcher.nodeWatch(context.TODO())
+	}()
+}
+
+func (w *nodeWatcher) nodeWatch(ctx context.Context) {
+	var scopedLog *logrus.Entry
+
+	key := path.Join(NodeStorePrefix, types.GetName())
+
+restart:
+	watcher := kvstore.Client().ListAndWatch(ctx, "NodeWatcher", key, 512)
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				log.Debugf("%s closed, restarting watch", watcher.String())
+				time.Sleep(500 * time.Millisecond)
+				goto restart
+			}
+
+			scopedLog = log.WithFields(logrus.Fields{"kvstore-event": event.Typ.String(), "key": event.Key})
+			scopedLog.Debug("Received event")
+
+			if event.Typ == kvstore.EventTypeCreate ||
+				event.Typ == kvstore.EventTypeModify {
+				var node v2.CiliumNode
+				err := json.Unmarshal(event.Value, &node)
+				if err != nil {
+					scopedLog.WithError(err).Error("Error unmarshaling data from kvstore")
+					continue
+				}
+
+				hostEp := w.em.GetHostEndpoint()
+				if hostEp == nil {
+					continue
+				}
+
+				scopedLog.Debug("Node annotation update. New visibility annotation - ", node.Annotations[annotation.ProxyVisibility])
+
+				hostEp.UpdateVisibilityPolicy(func(_, _ string) (proxyVisibility string, err error) {
+					return node.Annotations[annotation.ProxyVisibility], nil
+				})
+
+				regenMetadata := &regeneration.ExternalRegenerationMetadata{
+					Reason:            "annotations updated",
+					RegenerationLevel: regeneration.RegenerateWithoutDatapath,
+				}
+				regen, _ := hostEp.SetRegenerateStateIfAlive(regenMetadata)
+				if regen {
+					hostEp.Regenerate(regenMetadata)
+				}
+			}
+		case <-ctx.Done():
+			// Stop this policy watcher, we have been signaled to shut down
+			// via context.
+			watcher.Stop()
+			return
+		}
+	}
 }

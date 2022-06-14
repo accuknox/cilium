@@ -70,6 +70,7 @@ import (
 	"github.com/cilium/cilium/pkg/metrics"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/node"
+	nodeStore "github.com/cilium/cilium/pkg/node/store"
 	nodeTypes "github.com/cilium/cilium/pkg/node/types"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/pidfile"
@@ -1613,6 +1614,10 @@ func runDaemon() {
 			"Create host endpoint", nodeTypes.GetName()); err != nil {
 			log.WithError(err).Fatal("Unable to create host endpoint")
 		}
+	}
+
+	if option.Config.JoinCluster {
+		nodeStore.InitNodeAnnotationWatcher(d.endpointManager)
 	}
 
 	if option.Config.EnableIPMasqAgent {
