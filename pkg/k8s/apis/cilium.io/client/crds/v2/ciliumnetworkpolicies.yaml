@@ -362,6 +362,7 @@ spec:
                                       IDs. All peers presenting a certificate valid
                                       for any of the peers listed here is allowed.
                                     items:
+                                      pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                       type: string
                                     type: array
                                 type: object
@@ -709,6 +710,7 @@ spec:
                                       IDs. All peers presenting a certificate valid
                                       for any of the peers listed here is allowed.
                                     items:
+                                      pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                       type: string
                                     type: array
                                 type: object
@@ -1596,6 +1598,7 @@ spec:
                                       IDs. All peers presenting a certificate valid
                                       for any of the peers listed here is allowed.
                                     items:
+                                      pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                       type: string
                                     type: array
                                 type: object
@@ -1943,6 +1946,7 @@ spec:
                                       IDs. All peers presenting a certificate valid
                                       for any of the peers listed here is allowed.
                                     items:
+                                      pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                       type: string
                                     type: array
                                 type: object
@@ -2637,6 +2641,7 @@ spec:
                                         valid for any of the peers listed here is
                                         allowed.
                                       items:
+                                        pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                         type: string
                                       type: array
                                   type: object
@@ -2991,6 +2996,7 @@ spec:
                                         valid for any of the peers listed here is
                                         allowed.
                                       items:
+                                        pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                         type: string
                                       type: array
                                   type: object
@@ -3891,6 +3897,7 @@ spec:
                                         valid for any of the peers listed here is
                                         allowed.
                                       items:
+                                        pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                         type: string
                                       type: array
                                   type: object
@@ -4245,6 +4252,7 @@ spec:
                                         valid for any of the peers listed here is
                                         allowed.
                                       items:
+                                        pattern: ^(spiffe:\/\/)([-a-z0-9.\-\_]+[.]?)+\/([-a-zA-Z0-9\_\-\*\.]+[\/]?)+$
                                         type: string
                                       type: array
                                   type: object
